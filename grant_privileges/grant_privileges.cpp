@@ -1,9 +1,4 @@
-﻿#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <vector>
-#include <Windows.h>
+﻿#include "grant_privileges.h"
 
 inline std::string GetValue(const HKEY hKey, const std::string& sub_key, const std::string& key) {
     HKEY hkey = nullptr;
@@ -56,27 +51,53 @@ inline bool SetValue(const HKEY hKey, const std::string& sub_key, const std::str
 int main()
 {
     std::string json_filepath{ GetValue(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\AppModel\\Lookaside\\machine\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.apple.passwordmanager", "") };
+    std::string icloud_dir;
     if (json_filepath.empty())
     {
         std::cout << "Extension for Chrome/Edge should be installed and enabled via iCloud first." << std::endl;
         getchar();
-        return;
+        return 0;
     }
-    /* uint32_t last_backslash;
-     for (uint32_t i = 0; i < json_file.length(); ++i)
-     {
-         if (json_file[i] == '\\')
-         {
-             last_backslash = i;
-         }
-     }
-     std::string json_path{ json_file.substr(0, static_cast<std::basic_string<char, std::char_traits<char>, std::allocator<char>>::size_type>(last_backslash) + 1) };
-     std::cout << json_file_location << std::endl;
-     std::cout << json_file_location.substr(0, last_backslash + 1) << std::endl;*/
+    else
+    {
+        uint32_t last_backslash;
+        for (uint32_t i = 0; i < json_filepath.length(); ++i)
+        {
+            if (json_filepath[i] == '\\')
+            {
+                last_backslash = i;
+            }
+        }
+        icloud_dir = json_filepath.substr(0, static_cast<std::basic_string<char, std::char_traits<char>, std::allocator<char>>::size_type>(last_backslash) + 1);
+    }
     std::ifstream json_file{ json_filepath };
-    std::ostringstream tmp;
-    tmp << json_file.rdbuf();
-    std::string str = tmp.str();
-    std::cout << str << std::endl;
+    configor::json j;
+    json_file >> j;
+    std::string firefox_json_filepath{ getenv("USERPROFILE") };
+    if (firefox_json_filepath[firefox_json_filepath.length()] != '\\') {
+        firefox_json_filepath += "\\.config\\passwordmanager_for_firefox\\FirefoxPwdMgrHostApp_manifest.json";
+    }
+    else
+    {
+        firefox_json_filepath += ".config\\passwordmanager_for_firefox\\FirefoxPwdMgrHostApp_manifest.json";
+    }
+    configor::json j2{
+        { "name", j["name"]},
+        { "description", "Apple iCloud Firefox Password Manager Host App" },
+        { "path", icloud_dir + (std::string)j["path"]},
+        { "type", j["type"]},
+        { "allowed_extensions", { "{724e544e-ae3e-4fc9-9262-7f650d731cd8}" } },
+    };
+    std::ofstream outfile{ firefox_json_filepath };
+    outfile << std::setw(4) << j2 << std::endl;
+    if (SetValue(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\AppModel\\Lookaside\\machine\\Software\\Mozilla\\NativeMessagingHosts\\com.apple.passwordmanager", "", firefox_json_filepath))
+    {
+        std::cout << "The Firefox Extension is ready to run." << std::endl;
+    }
+    else
+    {
+        std::cout << "Failed to set REG value, please try to rerun using Administrator privilege." << std::endl;
+    }
+    getchar();
     return 0;
 }
