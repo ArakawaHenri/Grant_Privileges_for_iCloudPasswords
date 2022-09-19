@@ -60,27 +60,49 @@ int main()
     }
     else
     {
-        uint32_t last_backslash;
-        for (uint32_t i = 0; i < json_filepath.length(); ++i)
+        uint64_t last_backslash{ json_filepath.length() };
+        for (auto i = last_backslash; i > 0;)
         {
-            if (json_filepath[i] == '\\')
+            if (json_filepath[--i] == '\\')
             {
+
                 last_backslash = i;
+                break;
             }
         }
-        icloud_dir = json_filepath.substr(0, static_cast<std::basic_string<char, std::char_traits<char>, std::allocator<char>>::size_type>(last_backslash) + 1);
+        if (last_backslash == 0)
+        {
+            std::cout << "Failed to read iCloud Client path, please try to re-enable iCloud Passwords for Chrome/Edge." << std::endl;
+        }
+        icloud_dir = json_filepath.substr(0, last_backslash + 1);
     }
     std::ifstream json_file{ json_filepath };
     configor::json j;
     json_file >> j;
     std::string firefox_json_filepath{ getenv("USERPROFILE") };
     if (firefox_json_filepath[firefox_json_filepath.length()] != '\\') {
-        firefox_json_filepath += "\\.config\\passwordmanager_for_firefox\\FirefoxPwdMgrHostApp_manifest.json";
+        firefox_json_filepath += "\\.config";
     }
     else
     {
-        firefox_json_filepath += ".config\\passwordmanager_for_firefox\\FirefoxPwdMgrHostApp_manifest.json";
+        firefox_json_filepath += ".config";
     }
+    if (0 != _access(firefox_json_filepath.c_str(), 0))
+    {
+        if (0 != _mkdir(firefox_json_filepath.c_str()))
+        {
+            std::cout << "Failed to mkdir, please try to rerun using Administrator privilege.";
+        }
+    }
+    firefox_json_filepath += "\\passwordmanager_for_firefox";
+    if (0 != _access(firefox_json_filepath.c_str(), 0))
+    {
+        if (0 != _mkdir(firefox_json_filepath.c_str()))
+        {
+            std::cout << "Failed to mkdir, please try to rerun using Administrator privilege.";
+        }
+    }
+    firefox_json_filepath += "\\FirefoxPwdMgrHostApp_manifest.json";
     configor::json j2{
         { "name", j["name"]},
         { "description", "Apple iCloud Firefox Password Manager Host App" },
